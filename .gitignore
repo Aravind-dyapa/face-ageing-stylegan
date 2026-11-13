@@ -1,4 +1,39 @@
-.idea
+
+# Large pretrained model files
+*.pt
+*.pth
+*.ckpt
+*.dat
+*.bz2
+
+# Python cache
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Virtual environments
+venv/
+env/
+
+# Logs
+*.log
+
+# Generated outputs and uploaded images
+outputs/
+results/
+uploads/
+
+# OS files
 .DS_Store
-pretrained_models/
-shape_predictor_68_face_landmarks.dat
+Thumbs.db
+
+# Secrets and environment variables
+.env
+.env.*
+# Keep experimental face images private
+experiments/baseline/*.png
+experiments/wnnr/*.png
+experiments/multi_age_wnnr/age_*.png
+
+
+# Experimental face images (kept private)
