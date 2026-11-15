@@ -1,144 +1,174 @@
+# Face Ageing and De-ageing Using Conditional StyleGAN with WNNR-Inspired Latent-Space Regularization
 
-# Face Ageing and De-ageing using Conditional StyleGAN
+A face-ageing and de-ageing research project built on the **pretrained Style-based Age Manipulation (SAM)** framework and its StyleGAN2 decoder. The project adds a **WNNR-inspired SVD-based latent-space regularization** operation to the SAM inference pipeline.
 
-An interactive face ageing and de-ageing application built using the pretrained SAM (Style-based Age Manipulation) framework, with an experimental WNNR-inspired latent-space regularization extension.
+> **Research scope:** This repository extends pretrained SAM during inference. It does not train SAM from scratch or claim that the WNNR-inspired step has proven improvements in identity preservation, age accuracy, or perceptual image quality.
 
 ## Overview
 
-This project explores facial age transformation using a pretrained StyleGAN-based framework.
+The application accepts an aligned face image and a target age, generates a baseline SAM output, and optionally applies weighted singular-value shrinkage to the encoded W+ latent before decoding it with StyleGAN2.
 
-Users can upload a face image, select a target age, and generate an age-transformed output. The application also provides an experimental latent-space regularization option to study its effect on generated images.
+## Architecture
 
-## Key Features
+![Implemented architecture](Face_Ageing_Architecture_Diagram.png)
 
-- Face ageing and de-ageing across target ages from 0 to 100.
-- Face alignment and preprocessing using dlib.
-- Pretrained SAM model for age transformation.
-- WNNR-inspired latent-space regularization.
-- Comparison between baseline and regularized outputs.
-- Singular value analysis and nuclear norm measurements.
-- SSIM and PSNR experimental evaluation.
-- Interactive Streamlit application.
-- Experimental dashboard with recorded results.
+Pipeline:
+1. Align and preprocess the input face.
+2. Create a target-age conditioning channel (target age scaled by 100) and concatenate it with the RGB input.
+3. Pass the conditioned image through the pretrained SAM encoder.
+4. Obtain the W+ latent representation (`[1, 18, 512]`).
+5. Call `AgeTransformer.apply_wnnr()` to center, decompose, shrink and reconstruct the latent.
+6. Decode the modified latent with the pretrained StyleGAN2 generator.
+7. Compare the regularized image with the baseline SAM image using SSIM and PSNR.
 
-## Methodology
+## WNNR-inspired latent regularization
 
-### 1. Baseline Age Transformation
+Let `W+` be the encoded latent and `W_avg` be the model's latent average.
 
-The pretrained SAM framework maps an input face into the StyleGAN latent space and performs age transformation using the pretrained generator.
+**Centering**
 
-### 2. WNNR-inspired Latent Regularization
+`Z = W+ - W_avg`
 
-An experimental regularization operation is applied to the SAM-generated W+ latent representation.
+**SVD**
 
-The implementation:
-1. Centers the latent representation using the latent average.
-2. Performs Singular Value Decomposition (SVD).
-3. Applies weighted singular value shrinkage.
-4. Reconstructs the modified latent representation.
-5. Generates the output using the pretrained StyleGAN2 decoder.
+`Z = U Σ Vᵀ`
 
-The singular value shrinkage is defined as:
+**Weighted shrinkage**
 
-\[
-\sigma'_i = \max(\sigma_i-\lambda w_i,0)
-\]
+`σ'_i = max(σ_i - λ w_i, 0)`
 
-where:
-- \(\sigma_i\) represents a singular value.
-- \(\lambda\) controls regularization strength.
-- \(w_i\) represents the corresponding weight.
+The implementation uses a linearly decreasing weight sequence from `1.0` to `0.2`. The regularization strength `λ` controls shrinkage.
 
-This is an experimental WNNR-inspired extension, not a newly proposed WNNR algorithm.
+**Reconstruction**
 
-## Technology Stack
+`W'+ = U Σ' Vᵀ + W_avg`
 
-- Python
-- PyTorch
-- StyleGAN2
-- SAM (Style-based Age Manipulation)
-- Singular Value Decomposition (SVD)
-- NumPy
-- OpenCV
-- dlib
-- Streamlit
-- scikit-image
+The reconstructed latent is sent to the pretrained StyleGAN2 decoder.
 
-## Project Structure
+### Code integration
+
+The WNNR-inspired operation is implemented as the `apply_wnnr()` method inside:
+
+`datasets/augmentations.py` → `AgeTransformer`
+
+The Streamlit application imports `AgeTransformer` and calls this method on the SAM encoder's W+ latent. The method acts on the latent representation, not on the RGB image or age channel.
+
+## Features
+
+- Face image upload and preprocessing/alignment
+- Target-age selection
+- Baseline SAM image generation
+- Optional WNNR-inspired latent regularization
+- Adjustable regularization strength (`λ`)
+- StyleGAN2 decoding of the modified latent
+- SSIM and PSNR comparison against baseline SAM output
+- Separate experimental dashboard for recorded experiment results
+
+## Repository structure
 
 ```text
 SAM/
-├── configs/
-├── criteria/
-│   └── wnnr_loss.py
 ├── datasets/
-├── experiments/
-│   ├── baseline/
-│   ├── wnnr/
-│   └── multi_age_wnnr/
+│   └── augmentations.py       # AgeTransformer and apply_wnnr()
 ├── face_ageing_app/
-│   ├── app.py
+│   ├── app.py                 # Streamlit face-ageing application
 │   └── experiment_dashboard.py
+├── criteria/
+│   └── wnnr_loss.py           # WNNR-inspired regularization utilities (if used by experiments)
+├── experiments/               # Recorded experimental data / plots
 ├── models/
-│   └── stylegan2/
-│       └── op/
-│           ├── fused_act.py
-│           └── upfirdn2d.py
-├── pretrained_models/
 ├── scripts/
-├── .gitignore
-└── README.md
+├── configs/
+└── pretrained_models/         # Model weights are not committed to GitHub
 ```
 
-## Experimental Evaluation
+Actual files may vary slightly by project revision.
 
-The project investigates the effect of different regularization strengths on latent representations.
+## Requirements
 
-Evaluation includes:
-- Nuclear norm measurements.
-- Structural Similarity Index (SSIM).
-- Peak Signal-to-Noise Ratio (PSNR).
-- Baseline versus regularized output comparisons.
+- Python environment compatible with the original SAM repository
+- PyTorch and the dependencies specified by the SAM implementation
+- Streamlit
+- scikit-image
+- dlib and face-alignment dependencies used by the project
+- A GPU is recommended for practical inference
+- The pretrained SAM checkpoint and dlib landmark predictor
 
-**Note:** SSIM and PSNR in the current experiments measure similarity between regularized outputs and baseline SAM outputs. They do not independently establish improved perceptual quality or identity preservation. The experiments are preliminary and should not be interpreted as broad validation.
+## Setup
 
-## Running the Application
+1. Clone this repository:
 
-The application is developed and tested in Google Colab with GPU acceleration.
+   ```bash
+   git clone https://github.com/Aravind-dyapa/face-ageing-stylegan.git
+   cd face-ageing-stylegan
+   ```
 
-1. Clone this repository.
-2. Obtain the pretrained SAM checkpoint and required landmark predictor.
-3. Place the checkpoint at `pretrained_models/sam_ffhq_aging.pt`.
-4. Place the landmark predictor at `shape_predictor_68_face_landmarks.dat` in the project root.
-5. Install the required dependencies.
-6. Launch the Streamlit application:
+2. Install the dependencies required by the original SAM implementation and the additional application packages:
 
-```bash
-cd face_ageing_app
-streamlit run app.py
-```
+   ```bash
+   pip install streamlit scikit-image
+   ```
 
-To launch the experimental dashboard:
+   Install the remaining packages according to the SAM repository's environment instructions. `dlib` installation may require platform-specific setup.
 
-```bash
-streamlit run experiment_dashboard.py --server.port 8502
-```
+3. Obtain the pretrained SAM checkpoint and place it at:
 
-The pretrained model and landmark predictor are not included in this repository because of their size and licensing considerations. Refer to the original SAM project for model acquisition instructions.
+   ```text
+   pretrained_models/sam_ffhq_aging.pt
+   ```
 
-## Original Research and Acknowledgements
+4. Place the 68-point dlib landmark predictor at the path expected by the application:
 
-This implementation builds upon:
+   ```text
+   shape_predictor_68_face_landmarks.dat
+   ```
 
-**Only a Matter of Style: Age Transformation Using a Style-Based Regression Model**
+   These large model assets are excluded from this repository and must be obtained separately from their respective sources / project setup.
 
-Yuval Alaluf, Or Patashnik, and Daniel Cohen-Or, SIGGRAPH 2021.
+5. Confirm the paths in `face_ageing_app/app.py`, then run:
 
-Original implementation:
-https://github.com/yuval-alaluf/SAM
+   ```bash
+   cd face_ageing_app
+   streamlit run app.py
+   ```
 
-The original SAM authors retain credit for their framework and pretrained model. This repository contains an experimental extension and application built on top of their work.
+For Google Colab, restore the project and model assets to the expected `/content/SAM` directory before launching Streamlit.
 
-## Disclaimer
+## Evaluation
 
-This project is intended for academic and research purposes. Generated age transformations are synthetic and may not represent actual human ageing.
+SSIM and PSNR in the current application compare the WNNR-regularized output against the baseline SAM output for the same input and target age.
+
+Previously recorded example comparisons:
+
+| Regularization strength (λ) | SSIM | PSNR |
+|---:|---:|---:|
+| 0.5 | 0.99543 | 42.73 dB |
+| 2.0 | 0.97137 | 31.90 dB |
+
+These are example observations from a limited experiment, not aggregate benchmark results. Higher SSIM / PSNR here indicates greater similarity to the baseline output; it does **not** by itself establish better image quality, identity preservation, or target-age accuracy.
+
+## Limitations
+
+- Current quantitative experiments are preliminary and cover a limited number of inputs and settings.
+- SSIM and PSNR are baseline-similarity measures in this setup.
+- Identity preservation and target-age accuracy require separate metrics and validation.
+- Generalization, demographic fairness and robustness have not yet been established.
+- The project uses pretrained SAM / StyleGAN2 weights and does not claim model training or fine-tuning.
+
+## Future work
+
+- Identity similarity evaluation using ArcFace embeddings
+- Target-age alignment using an independent age estimator
+- Larger and more diverse evaluation set
+- Baseline comparisons with alternative regularization methods
+- Ablation of λ and singular-value weight schedules
+- Reporting averages, variance and failure cases
+
+## References
+
+- SAM paper: *Only a Matter of Style: Age Transformation Using a Style-Based Regression Model* (Alaluf, Patashnik & Cohen-Or, 2021).
+- Original SAM repository: https://github.com/yuval-alaluf/SAM
+
+## Acknowledgement
+
+This project builds on the research and pretrained implementation of SAM. The WNNR-inspired latent regularization is an experimental extension implemented for this project.
